@@ -1,0 +1,67 @@
+version: '3'
+services:
+  nginx:
+    image: nginx:1.15.5
+    ports:
+      - 5601:5601
+      - 9200:9200
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/default.conf:/etc/nginx/default.conf:ro
+    depends_on:
+      - kibana
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.5.1
+    container_name: elasticsearch
+    environment:
+      "discovery.type": single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    expose:
+      - 9200
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.4.2
+    expose:
+      - 5601
+    tty: true
+    depends_on:
+      - elasticsearch
+    environment:
+      ELASTICSEARCH_URL: 'http://elasticsearch:9200'
+      XPACK_SECURITY_ENABLED: 'false'
+
+  logstash:
+    build:
+      context: logstash/
+      args:
+        ELK_VERSION: "6.5.4"
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+   # networks:
+    #  - elk
+    depends_on:
+      - elasticsearch
+
+  #redis:
+  #  image: redis:4.0-alpine
+  #  ports:
+  #      - 6379:6379
+
+volumes:
+  esdata: {}
+
+#networks:
+ # elk:
+  #  driver: bridge
